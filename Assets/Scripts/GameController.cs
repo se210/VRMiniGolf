@@ -5,11 +5,19 @@ public class GameController : MonoBehaviour {
 
 	public static GameController gameController;
 
+	public int strokes;
+	public int level;
+
+	public bool mStrokeStarted;
+
 	void Awake() {
 		if (gameController == null)
 		{
 			DontDestroyOnLoad(gameObject);
 			gameController = this;
+			strokes = 0;
+			level = 1;
+			mStrokeStarted = false;
 		}
 		else if (gameController != this)
 		{
@@ -24,7 +32,16 @@ public class GameController : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-	
+		if (mStrokeStarted)
+		{
+			GameObject golfBall = GameObject.Find("GolfBall");
+			Rigidbody golfBallRB = golfBall.GetComponent<Rigidbody>();
+
+			if (golfBallRB.velocity.magnitude < 0.01)
+			{
+				setPlayerPosition ();
+			}
+		}
 	}
 
 	public void setPlayerPosition()
