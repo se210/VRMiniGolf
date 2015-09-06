@@ -168,9 +168,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
 		
 		private void FixedUpdate()
 		{
-//			GroundCheck();
-			Vector2 input = GetInput();
-
+			// Wiimote
 			handleEvent();
 			IntPtr pWiimote6dof = Wiimote6DOF();
 			if (pWiimote6dof != null)
@@ -181,6 +179,11 @@ namespace UnityStandardAssets.Characters.FirstPerson
 
 				transform.parent.localEulerAngles = new Vector3(result[2], 0,  -result[0]-97);
 			}
+
+			// Match direction to camera
+			Vector3 localEulerAngles = transform.parent.localEulerAngles;
+			localEulerAngles.y = cam.transform.localEulerAngles.y;
+			transform.parent.localEulerAngles = localEulerAngles;
 		}
 		
 		
