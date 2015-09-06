@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
+using System.Runtime.InteropServices;
 
 namespace UnityStandardAssets.Characters.FirstPerson
 {
@@ -86,7 +87,29 @@ namespace UnityStandardAssets.Characters.FirstPerson
 		private float m_YRotation;
 		private Vector3 m_GroundContactNormal;
 		private bool m_Jump, m_PreviouslyGrounded, m_Jumping, m_IsGrounded;
-		
+
+		[DllImport("WiiuseUnity")]
+		private static extern bool WiimoteInit();
+
+		[DllImport("WiiuseUnity")]
+		private static extern void SetDebugLogFptr(IntPtr fp);
+
+		[DllImport("WiiuseUnity")]
+		private static extern void handleEvent();
+
+		[DllImport("WiiuseUnity")]
+		private static extern IntPtr Wiimote6DOF();
+
+		[DllImport("WiiuseUnity")]
+		private static extern void FreeMemory(IntPtr ptr);
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		public delegate void DebugLogDelegate(string str);
+
+		static void DebugLog(string str)
+		{
+			Debug.Log("WiimoteTracking : " + str);
+		}
 		
 		public Vector3 Velocity
 		{
@@ -121,12 +144,28 @@ namespace UnityStandardAssets.Characters.FirstPerson
 			m_RigidBody = GetComponent<Rigidbody>();
 			m_Capsule = GetComponent<CapsuleCollider>();
 			mouseLook.Init (transform, cam.transform);
+
+			// Setup so that DLL can call Unity's Debug.Log
+			DebugLogDelegate callback_delegate = new DebugLogDelegate( DebugLog );
+			
+			// Convert callback_delegate into a function pointer that can be
+			// used in unmanaged code.
+			IntPtr intptr_delegate = 
+				Marshal.GetFunctionPointerForDelegate(callback_delegate);
+			
+			// Call the API passing along the function pointer.
+			SetDebugLogFptr( intptr_delegate );
+
+			if (!WiimoteInit ())
+			{
+				Debug.Log("Wiimote initialization failed.");
+			}
 		}
 		
 		
 		private void Update()
 		{
-			RotateView();
+//			RotateView();
 			
 			if (CrossPlatformInputManager.GetButtonDown("Jump") && !m_Jump)
 			{
@@ -139,51 +178,59 @@ namespace UnityStandardAssets.Characters.FirstPerson
 		{
 //			GroundCheck();
 			Vector2 input = GetInput();
-			m_IsGrounded = true;
-			
-			if ((Mathf.Abs(input.x) > float.Epsilon || Mathf.Abs(input.y) > float.Epsilon) && (advancedSettings.airControl || m_IsGrounded))
-			{
-				// always move along the camera forward as it is the direction that it being aimed at
-				Vector3 desiredMove = cam.transform.forward*input.y + cam.transform.right*input.x;
-				desiredMove = Vector3.ProjectOnPlane(desiredMove, m_GroundContactNormal).normalized;
-				
-				desiredMove.x = desiredMove.x*movementSettings.CurrentTargetSpeed;
-				desiredMove.z = desiredMove.z*movementSettings.CurrentTargetSpeed;
-				desiredMove.y = desiredMove.y*movementSettings.CurrentTargetSpeed;
-				if (m_RigidBody.velocity.sqrMagnitude <
-				    (movementSettings.CurrentTargetSpeed*movementSettings.CurrentTargetSpeed))
-				{
-//					m_RigidBody.AddForce(desiredMove*SlopeMultiplier(), ForceMode.Impulse);
-					transform.Translate(desiredMove);
-				}
-			}
 
-			if (m_IsGrounded)
-			{
-				m_RigidBody.drag = 5f;
-				
-				if (m_Jump)
-				{
-					m_RigidBody.drag = 0f;
-					m_RigidBody.velocity = new Vector3(m_RigidBody.velocity.x, 0f, m_RigidBody.velocity.z);
-					m_RigidBody.AddForce(new Vector3(0f, movementSettings.JumpForce, 0f), ForceMode.Impulse);
-					m_Jumping = true;
-				}
-				
-				if (!m_Jumping && Mathf.Abs(input.x) < float.Epsilon && Mathf.Abs(input.y) < float.Epsilon && m_RigidBody.velocity.magnitude < 1f)
-				{
-					m_RigidBody.Sleep();
-				}
-			}
-			else
-			{
-				m_RigidBody.drag = 0f;
-				if (m_PreviouslyGrounded && !m_Jumping)
-				{
-					StickToGroundHelper();
-				}
-			}
-			m_Jump = false;
+			handleEvent();
+			IntPtr pWiimote6dof = Wiimote6DOF();
+			float[] result = new float[ 3 ];
+			Marshal.Copy( pWiimote6dof, result, 0, 3 );
+			FreeMemory(pWiimote6dof);
+
+			transform.parent.localEulerAngles = new Vector3(result[2], 90,  -result[0]-90);
+//			m_IsGrounded = true;
+//			
+//			if ((Mathf.Abs(input.x) > float.Epsilon || Mathf.Abs(input.y) > float.Epsilon) && (advancedSettings.airControl || m_IsGrounded))
+//			{
+//				// always move along the camera forward as it is the direction that it being aimed at
+//				Vector3 desiredMove = cam.transform.forward*input.y + cam.transform.right*input.x;
+//				desiredMove = Vector3.ProjectOnPlane(desiredMove, m_GroundContactNormal).normalized;
+//				
+//				desiredMove.x = desiredMove.x*movementSettings.CurrentTargetSpeed;
+//				desiredMove.z = desiredMove.z*movementSettings.CurrentTargetSpeed;
+//				desiredMove.y = desiredMove.y*movementSettings.CurrentTargetSpeed;
+//				if (m_RigidBody.velocity.sqrMagnitude <
+//				    (movementSettings.CurrentTargetSpeed*movementSettings.CurrentTargetSpeed))
+//				{
+//					m_RigidBody.AddForce(desiredMove*SlopeMultiplier(), ForceMode.Impulse);
+//					transform.Translate(desiredMove);
+//				}
+//			}
+//
+//			if (m_IsGrounded)
+//			{
+//				m_RigidBody.drag = 5f;
+//				
+//				if (m_Jump)
+//				{
+//					m_RigidBody.drag = 0f;
+//					m_RigidBody.velocity = new Vector3(m_RigidBody.velocity.x, 0f, m_RigidBody.velocity.z);
+//					m_RigidBody.AddForce(new Vector3(0f, movementSettings.JumpForce, 0f), ForceMode.Impulse);
+//					m_Jumping = true;
+//				}
+//				
+//				if (!m_Jumping && Mathf.Abs(input.x) < float.Epsilon && Mathf.Abs(input.y) < float.Epsilon && m_RigidBody.velocity.magnitude < 1f)
+//				{
+//					m_RigidBody.Sleep();
+//				}
+//			}
+//			else
+//			{
+//				m_RigidBody.drag = 0f;
+//				if (m_PreviouslyGrounded && !m_Jumping)
+//				{
+//					StickToGroundHelper();
+//				}
+//			}
+//			m_Jump = false;
 		}
 		
 		
