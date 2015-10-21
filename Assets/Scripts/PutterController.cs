@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
 using System.Runtime.InteropServices;
+using System.IO.Ports;
 
 namespace UnityStandardAssets.Characters.FirstPerson
 {
@@ -17,6 +18,8 @@ namespace UnityStandardAssets.Characters.FirstPerson
 		private bool m_Jump, m_PreviouslyGrounded, m_Jumping, m_IsGrounded;
 
 		private float targetAngle;
+
+		SerialPort sp = new SerialPort("COM4", 9600);
 
 		[DllImport("WiiuseUnity")]
 		private static extern bool WiimoteInit();
@@ -61,11 +64,15 @@ namespace UnityStandardAssets.Characters.FirstPerson
 			{
 				Debug.Log("Wiimote initialization failed.");
 			}
+
+			sp.Open();
 		}
 		
 		
 		private void Update()
 		{
+//			String strIn = sp.ReadLine();
+//			Debug.Log(strIn);
 		}
 		
 		
@@ -85,6 +92,8 @@ namespace UnityStandardAssets.Characters.FirstPerson
 				Vector3 angles = transform.parent.localEulerAngles;
 				angles.z = Mathf.LerpAngle(angles.z, targetAngle, Time.deltaTime);
 				transform.parent.localEulerAngles = angles;
+
+				sp.Write(((int) angles.z).ToString() + " ");
 			}
 
 			// Match direction to camera
@@ -99,6 +108,7 @@ namespace UnityStandardAssets.Characters.FirstPerson
 			{
 				GameController.gameController.strokes++;
 				GameController.gameController.mStrokeStarted = true;
+				sp.Write(12345.ToString() + " ");
 			}
 		}
 
